@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenManus API Client</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: #333;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .input-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: inherit;
+            font-size: 16px;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            max-width: 200px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .status-section {
+            background-color: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
+        .status-label {
+            font-weight: bold;
+        }
+
+        .steps-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            counter-reset: thought-step;
+        }
+
+        .step-item {
+            background-color: #f9f9f9;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
+        .step-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+            color: #333;
+        }
+
+        .step-content {
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+
+        /* Hierarchical step styling */
+        .thought-step {
+            border-left: 4px solid #4CAF50;
+            background-color: #f9f9f9;
+        }
+
+        .action-step {
+            margin-left: 30px;
+            border-left: 4px solid #2196F3;
+            background-color: #f5f5f5;
+            font-size: 0.95em;
+        }
+
+        .result-step {
+            margin-left: 60px;
+            border-left: 4px solid #FF9800;
+            background-color: #f0f0f0;
+            font-size: 0.9em;
+        }
+
+        /* Step counter style - only for thought steps */
+        .thought-step .step-header::before {
+            counter-increment: thought-step;
+            content: counter(thought-step) ". ";
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .step-item.hidden {
+            display: none;
+        }
+
+        .step-type-icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        .collapse-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0 5px;
+            color: #555;
+            max-width: none;
+        }
+
+        .step-content pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+        }
+
+        .step-content code {
+            font-family: Consolas, Monaco, 'Andale Mono', monospace;
+            font-size: 0.9em;
+        }
+
+        .step-content strong {
+            font-weight: bold;
+        }
+
+        .result-section {
+            background-color: #f0f8ff;
+            padding: 20px;
+            border-radius: 5px;
+            border: 1px solid #b8d0e8;
+            white-space: pre-wrap;
+        }
+
+        /* Add styling for arrows */
+        .step-arrow {
+            display: inline-block;
+            margin-right: 5px;
+            transition: transform 0.2s;
+        }
+
+        .collapsed .step-arrow {
+            transform: rotate(-90deg);
+        }
+
+        /* Hierarchical view styling */
+        .hierarchy-view .step-item {
+            margin-bottom: 5px;
+        }
+
+        .hierarchy-group {
+            margin-bottom: 15px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, .3);
+            border-radius: 50%;
+            border-top-color: #000;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .button-row {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .primary-button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .secondary-button {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        /* Add styles for the step hierarchy */
+        .step-children {
+            margin-left: 30px;
+            border-left: 2px solid #ddd;
+            padding-left: 10px;
+            display: block;
+        }
+
+        /* Make each step type more visually distinct */
+        .thought-step {
+            border-left: 4px solid #4CAF50;
+            background-color: #f9f9f9;
+        }
+
+        .action-step {
+            border-left: 4px solid #2196F3;
+            background-color: #f5f5f5;
+        }
+
+        .result-step {
+            border-left: 4px solid #FF9800;
+            background-color: #f0f0f0;
+        }
+
+        /* Add visual cue before step header to indicate hierarchy */
+        .action-step .step-header::before {
+            content: "↳";
+            color: #2196F3;
+            margin-right: 5px;
+        }
+
+        .result-step .step-header::before {
+            content: "↳";
+            color: #FF9800;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>OpenManus API Client</h1>
+    <div class="container">
+        <div class="input-section">
+            <h2>Your Query</h2>
+            <textarea id="query-input" placeholder="Enter your query..."></textarea>
+            <div class="button-row">
+                <button id="submit-btn">Submit Query</button>
+                <button id="abort-btn">Abort</button>
+            </div>
+        </div>
+
+        <div class="status-section">
+            <h2>Status</h2>
+            <p><span class="status-label">Session ID:</span> <span id="session-id">-</span></p>
+            <p><span class="status-label">Status:</span> <span id="status">-</span></p>
+            <p><span class="status-label">Project ID:</span> <span id="project-id">-</span></p>
+            <p><span class="status-label">Elapsed Time:</span> <span id="elapsed-time">-</span></p>
+        </div>
+
+        <div class="steps-section">
+            <h2>Steps <span id="steps-count">(0)</span></h2>
+            <div id="steps-container"></div>
+        </div>
+
+        <div class="result-section" id="result-container" style="display: none;">
+            <h2>Result</h2>
+            <div id="result-content"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentSessionId = null;
+        let eventSource = null; // We'll keep this variable name for reference but won't use the EventSource API
+        let stepsCount = 0;
+        let thoughtStepsCount = 0;
+        let timerInterval = null;
+        let startTime = null;
+        let useDirectPostStream = true; // Set this to true by default now
+        let fetchController = null;
+        let activeStream = false;
+
+        // Store step hierarchy information
+        let stepHierarchy = {};
+        let cycleToStepMap = {};
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', function () {
+            // Set default query
+            document.getElementById('query-input').value = "Tell me about travel destinations in Japan";
+
+            // Attach event listeners
+            document.getElementById('submit-btn').addEventListener('click', submitQuery);
+            document.getElementById('abort-btn').addEventListener('click', abortQuery);
+        });
+
+        function submitQuery() {
+            const queryInput = document.getElementById('query-input');
+            const query = queryInput.value.trim();
+
+            if (!query) {
+                showError('Please enter a query first');
+                return;
+            }
+
+            console.log('Submitting query:', query);
+
+            // Update UI for starting query
+            resetUI();
+            document.getElementById('submit-btn').disabled = true;
+            updateStatus('Starting query processing...');
+
+            // Start the timer
+            startTimer();
+
+            // Set up session identification
+            currentSessionId = null;
+            document.getElementById('session-id').innerText = 'Creating session...';
+
+            // Reset steps count
+            stepsCount = 0;
+            thoughtStepsCount = 0;
+            document.getElementById('steps-count').innerText = '(0)';
+
+            // Clear cycle tracking
+            cycleToStepMap = {};
+            stepHierarchy = {};
+
+            // Set active stream flag
+            activeStream = true;
+
+            try {
+                // Use the direct POST stream approach for simplicity
+                console.log('Using direct POST stream approach');
+                connectToStreamDirect(null, query);
+            } catch (error) {
+                console.error('Error starting query:', error);
+                showError(`Error: ${error.message}`);
+                document.getElementById('submit-btn').disabled = false;
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+            }
+        }
+
+        function abortActiveStream() {
+            // Abort any fetch controllers if using direct approach
+            if (fetchController) {
+                fetchController.abort();
+                fetchController = null;
+            }
+            activeStream = false;
+        }
+
+        // Create a session then connect to stream
+        function createSessionThenStream(query) {
+            // Prepare headers for fetch request
+            const headers = new Headers();
+            headers.append('Content-Type', 'application/json');
+
+            // First create a session with the query
+            fetch('/api/query', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({
+                    query: query
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    // Get the session ID from the response
+                    currentSessionId = data.session_id;
+                    document.getElementById('session-id').innerText = currentSessionId;
+                    document.getElementById('status').innerText = data.status;
+                    document.getElementById('project-id').innerText = data.project_id || '-';
+
+                    // Now connect to stream using fetch instead of EventSource
+                    connectToStreamWithFetch(currentSessionId);
+                })
+                .catch(error => {
+                    console.error('Error creating session:', error);
+                    updateStatus('Error: ' + error.message);
+                    document.getElementById('submit-btn').disabled = false;
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                });
+        }
+
+        // Connect to stream for an existing session using fetch
+        function connectToStreamWithFetch(sessionId) {
+            updateStatus('Connecting to stream...');
+
+            // Create a controller for aborting
+            fetchController = new AbortController();
+            const signal = fetchController.signal;
+
+            // Set active stream flag
+            activeStream = true;
+
+            // Create a decoder with utf-8 encoding
+            const decoder = new TextDecoder('utf-8');
+            let buffer = '';
+
+            console.log(`Starting stream connection for session ${sessionId}`);
+
+            // Call the GET endpoint with fetch instead of EventSource
+            fetch(`/api/stream/${sessionId}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive'
+                },
+                signal: signal
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    console.log('Stream connection established, reading data...');
+                    console.log('Response headers:', Object.fromEntries([...response.headers.entries()]));
+                    updateStatus('Connected to stream, processing events...');
+
+                    const reader = response.body.getReader();
+
+                    function readStream() {
+                        return reader.read().then(({ done, value }) => {
+                            if (done || !activeStream) {
+                                console.log('Stream complete or aborted');
+                                return;
+                            }
+
+                            // Decode the chunk and append to buffer
+                            const chunk = decoder.decode(value, { stream: true });
+                            console.log('Received chunk:', chunk);
+                            buffer += chunk;
+
+                            // Process complete events in buffer
+                            processSSEBuffer(buffer, result => {
+                                buffer = result;
+                            });
+
+                            // Continue reading
+                            return readStream();
+                        }).catch(err => {
+                            console.error('Error reading stream:', err);
+                            if (activeStream) {
+                                updateStatus(`Error: ${err.message}`);
+                                document.getElementById('submit-btn').disabled = false;
+                                abortActiveStream();
+                            }
+                        });
+                    }
+
+                    return readStream();
+                })
+                .catch(error => {
+                    if (error.name === 'AbortError') {
+                        console.log('Stream aborted by client');
+                    } else {
+                        console.error('Error connecting to stream:', error);
+                        updateStatus('Error: ' + error.message);
+                    }
+
+                    document.getElementById('submit-btn').disabled = false;
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                });
+        }
+
+        // Format markdown content with simple markdown support
+        function formatMarkdown(markdown) {
+            if (!markdown) {
+                console.warn('Empty markdown content received');
+                return '<em>No content</em>';
+            }
+
+            try {
+                // First, escape HTML to prevent XSS
+                let formatted = markdown.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+                // Format code blocks ```code```
+                formatted = formatted.replace(/```([\s\S]*?)```/g, (match, code) => {
+                    return `<pre class="code-block"><code>${code}</code></pre>`;
+                });
+
+                // Format inline code `code`
+                formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+                // Format headings
+                formatted = formatted.replace(/^### (.*$)/gm, '<h3>$1</h3>');
+                formatted = formatted.replace(/^## (.*$)/gm, '<h2>$1</h2>');
+                formatted = formatted.replace(/^# (.*$)/gm, '<h1>$1</h1>');
+
+                // Format bold **text**
+                formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+                // Format italic *text*
+                formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+                // Format lists
+                formatted = formatted.replace(/^\s*-\s+(.*$)/gm, '<li>$1</li>');
+                formatted = formatted.replace(/<li>(.*)<\/li>/g, '<ul><li>$1</li></ul>');
+                formatted = formatted.replace(/<\/ul><ul>/g, '');
+
+                // Convert line breaks to <br>
+                formatted = formatted.replace(/\n/g, '<br>');
+
+                return formatted;
+            } catch (error) {
+                console.error('Error formatting markdown:', error);
+                return markdown || '<em>No content</em>';
+            }
+        }
+
+        // Connect to the stream using fetch API directly
+        async function connectToStreamDirect(sessionId, query) {
+            const endpoint = '/api/stream';
+            console.log(`Connecting to SSE stream at ${endpoint} with sessionId=${sessionId}, query=${query}`);
+
+            const headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive'
+            };
+
+            const body = {
+                session_id: sessionId,
+                query: query,
+                include_past_events: true
+            };
+
+            try {
+                fetchController = new AbortController();
+                console.log('Created fetch controller for the stream');
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(body),
+                    signal: fetchController.signal
+                });
+
+                console.log('Stream response received:', response.status, response.statusText);
+                console.log('Response headers:', [...response.headers.entries()]);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`Stream error (${response.status}):`, errorText);
+                    showError(`Error: ${response.status} ${response.statusText}`);
+                    return;
+                }
+
+                if (!response.body) {
+                    console.error('Response body is null or undefined');
+                    showError('Error: Response has no readable body');
+                    return;
+                }
+
+                console.log('Starting to read the stream');
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+
+                    if (done) {
+                        console.log('Stream complete');
+                        break;
+                    }
+
+                    if (value) {
+                        console.log(`Received chunk of ${value.length} bytes`);
+
+                        // Convert bytes to text and add to buffer
+                        const chunk = decoder.decode(value, { stream: true });
+                        console.log('Decoded chunk:', chunk);
+
+                        buffer += chunk;
+
+                        // Process any complete events in the buffer
+                        processSSEBuffer(buffer, (remainingBuffer) => {
+                            buffer = remainingBuffer;
+                        });
+                    }
+                }
+
+                // Process any remaining data in the buffer
+                if (buffer.trim()) {
+                    console.log('Processing final buffer chunk');
+                    processSSEBuffer(buffer, () => {
+                        console.log('Final buffer processing complete');
+                    });
+                }
+
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('Stream connection aborted by user');
+                } else {
+                    console.error('Error connecting to stream:', error);
+                    showError(`Error: ${error.message}`);
+                }
+            } finally {
+                console.log('Stream connection ended');
+            }
+        }
+
+        // Process SSE buffer and extract events
+        function processSSEBuffer(buffer, callback) {
+            // Debug raw buffer
+            console.log('Processing buffer of length:', buffer.length);
+
+            // Split buffer into complete messages (each ending with \n\n)
+            const messages = buffer.split('\n\n');
+            let remainingBuffer = messages.pop(); // Keep the last incomplete chunk in buffer
+
+            console.log(`Found ${messages.length} complete messages in buffer`);
+
+            for (const message of messages) {
+                if (!message.trim()) {
+                    console.log('Skipping empty message');
+                    continue;
+                }
+
+                console.log('Processing message:', message);
+
+                // Split the message into lines
+                const lines = message.split('\n');
+                let eventType = null;
+                let data = null;
+
+                // Parse each line
+                for (const line of lines) {
+                    if (line.startsWith('event:')) {
+                        eventType = line.substring(6).trim();
+                        console.log('Found event type:', eventType);
+                    }
+                    else if (line.startsWith('data:')) {
+                        data = line.substring(5).trim();
+                        console.log('Found data of length:', data?.length);
+                    }
+                }
+
+                // If we couldn't extract event/data from format, try alternate formats
+                if (!eventType || !data) {
+                    console.log('Trying alternate parsing format...');
+                    // Try to parse as direct JSON (some servers don't use event: prefix)
+                    try {
+                        const jsonData = JSON.parse(message);
+                        if (jsonData && jsonData.type) {
+                            eventType = jsonData.type;
+                            data = JSON.stringify(jsonData.data || jsonData);
+                            console.log('Parsed as direct JSON with type:', eventType);
+                        }
+                    } catch (e) {
+                        console.log('Not valid JSON, skipping alternate parsing', e);
+                    }
+                }
+
+                if (eventType && data) {
+                    try {
+                        const parsedData = JSON.parse(data);
+                        console.log(`Received event: ${eventType}`, parsedData);
+
+                        // Handle the event based on type
+                        if (eventType === 'status') {
+                            updateStatus(parsedData.status);
+
+                            if (parsedData.session_id && (currentSessionId === 'pending' || !currentSessionId)) {
+                                currentSessionId = parsedData.session_id;
+                                document.getElementById('session-id').innerText = currentSessionId;
+                            }
+
+                            if (parsedData.project_id) {
+                                document.getElementById('project-id').innerText = parsedData.project_id;
+                            }
+                        }
+                        else if (eventType === 'step') {
+                            // Handle step event
+                            try {
+                                const stepIndex = parsedData.step_index;
+                                console.log(`Processing step ${stepIndex} with type ${parsedData.type}`);
+                                addStep(stepIndex, parsedData);
+                                stepsCount++;
+                            } catch (stepError) {
+                                console.error('Error processing step:', stepError);
+                            }
+                        }
+                        else if (eventType === 'complete') {
+                            // Update status and show result
+                            updateStatus(parsedData.status);
+
+                            if (parsedData.markdown) {
+                                document.getElementById('result-container').style.display = 'block';
+                                document.getElementById('result-content').innerHTML = formatMarkdown(parsedData.markdown);
+                            } else if (parsedData.result) {
+                                document.getElementById('result-container').style.display = 'block';
+                                document.getElementById('result-content').innerText = parsedData.result;
+                            }
+
+                            if (parsedData.error) {
+                                document.getElementById('result-container').style.display = 'block';
+                                document.getElementById('result-content').innerText = 'Error: ' + parsedData.error;
+                            }
+
+                            // Re-enable submit button
+                            document.getElementById('submit-btn').disabled = false;
+
+                            // Stop timer
+                            if (timerInterval) {
+                                clearInterval(timerInterval);
+                                timerInterval = null;
+                            }
+
+                            if (parsedData.elapsed_time) {
+                                document.getElementById('elapsed-time').innerText = formatTime(parsedData.elapsed_time);
+                            }
+
+                            // Stream is complete, clean up
+                            abortActiveStream();
+                        }
+                    } catch (e) {
+                        console.error('Error parsing JSON from event data:', e);
+                        console.error('Raw data:', data);
+                    }
+                } else {
+                    console.log('Skipping message without valid event type or data');
+                }
+            }
+
+            // Return the remaining buffer
+            callback(remainingBuffer);
+        }
+
+        function addStep(index, stepInfo) {
+            if (!stepInfo) {
+                console.error('Received null/undefined stepInfo for index', index);
+                return;
+            }
+
+            console.log('Adding step with index:', index, 'Info:', stepInfo);
+
+            const stepsContainer = document.getElementById('steps-container');
+            if (!stepsContainer) {
+                console.error('Steps container element not found');
+                return;
+            }
+
+            const stepType = determineStepType(stepInfo);
+            console.log('Determined step type:', stepType, 'for step', index);
+
+            // Check if the step already exists
+            if (document.getElementById(`step-${index}`)) {
+                console.log(`Step ${index} already exists, skipping`);
+                return;
+            }
+
+            // Track cycle to step mapping
+            if (stepInfo.cycle_index !== undefined) {
+                if (!cycleToStepMap[stepInfo.cycle_index]) {
+                    cycleToStepMap[stepInfo.cycle_index] = {
+                        thought: null,
+                        action: null,
+                        result: null
+                    };
+                }
+
+                if (stepType === 'thought') {
+                    cycleToStepMap[stepInfo.cycle_index].thought = index;
+                } else if (stepType === 'action') {
+                    cycleToStepMap[stepInfo.cycle_index].action = index;
+                } else if (stepType === 'result') {
+                    cycleToStepMap[stepInfo.cycle_index].result = index;
+                }
+            }
+
+            // Create step element
+            const stepElement = document.createElement('div');
+            stepElement.className = `step-item ${stepType}-step`;
+            stepElement.id = `step-${index}`;
+
+            // Determine if this step has a parent
+            let parentStepId = null;
+            let parentStepElement = null;
+
+            if (stepType === 'action' && stepInfo.cycle_index !== undefined) {
+                // Action steps are children of thought steps
+                const thoughtIndex = cycleToStepMap[stepInfo.cycle_index].thought;
+                if (thoughtIndex !== null) {
+                    parentStepId = `step-${thoughtIndex}`;
+                    parentStepElement = document.getElementById(parentStepId);
+                }
+            } else if (stepType === 'result' && stepInfo.cycle_index !== undefined) {
+                // Result steps are children of action steps
+                const actionIndex = cycleToStepMap[stepInfo.cycle_index].action;
+                if (actionIndex !== null) {
+                    parentStepId = `step-${actionIndex}`;
+                    parentStepElement = document.getElementById(parentStepId);
+                }
+            }
+
+            // Add collapse functionality for thoughts (which will have children)
+            let collapseButton = '';
+            if (stepType === 'thought') {
+                collapseButton = `<button class="collapse-button" onclick="toggleChildren(${index})">
+                    <span class="step-arrow">▼</span>
+                </button>`;
+            }
+
+            const stepHeader = document.createElement('div');
+            stepHeader.className = 'step-header';
+
+            // Only show step numbers for thought steps
+            let displayTitle = '';
+            if (stepType === 'thought') {
+                // Use counter instead of step index for display
+                thoughtStepsCount++;
+                console.log('Incremented thoughtStepsCount to', thoughtStepsCount);
+                displayTitle = `Thinking`;
+            } else if (stepType === 'action') {
+                // For actions, remove the step number
+                displayTitle = (stepInfo.title || '').replace(/^Step \d+: /, '');
+                if (stepInfo.tool) {
+                    displayTitle = `Using ${stepInfo.tool}`;
+                }
+            } else if (stepType === 'result') {
+                // For results, remove the step number
+                displayTitle = (stepInfo.title || '').replace(/^Step \d+: /, '');
+                if (stepInfo.tool) {
+                    displayTitle = `Result from ${stepInfo.tool}`;
+                }
+            } else {
+                displayTitle = stepInfo.title || `Step ${index}: Unnamed Step`;
+            }
+
+            stepHeader.innerHTML = `${collapseButton}${displayTitle}`;
+
+            const stepContent = document.createElement('div');
+            stepContent.className = 'step-content';
+
+            if (stepInfo.content) {
+                const formattedContent = formatMarkdown(stepInfo.content);
+                stepContent.innerHTML = formattedContent;
+            } else {
+                stepContent.innerText = 'No content';
+            }
+
+            stepElement.appendChild(stepHeader);
+            stepElement.appendChild(stepContent);
+
+            // Add the step to the hierarchy data
+            stepHierarchy[index] = {
+                element: stepElement,
+                type: stepType,
+                cycle: stepInfo.cycle_index,
+                children: []
+            };
+
+            // Create or get a parent container based on hierarchy
+            if (parentStepElement) {
+                console.log(`Adding step ${index} as child of ${parentStepId}`);
+
+                // Get or create the child container for the parent
+                let childContainer = parentStepElement.querySelector('.step-children');
+                if (!childContainer) {
+                    childContainer = document.createElement('div');
+                    childContainer.className = 'step-children';
+                    parentStepElement.appendChild(childContainer);
+                }
+
+                // Add this step to the child container
+                childContainer.appendChild(stepElement);
+
+                // Also track this relationship in our hierarchy object
+                if (stepType === 'action' && stepInfo.cycle_index !== undefined) {
+                    const thoughtIndex = cycleToStepMap[stepInfo.cycle_index].thought;
+                    if (thoughtIndex !== null && stepHierarchy[thoughtIndex]) {
+                        stepHierarchy[thoughtIndex].children.push(index);
+                    }
+                } else if (stepType === 'result' && stepInfo.cycle_index !== undefined) {
+                    const actionIndex = cycleToStepMap[stepInfo.cycle_index].action;
+                    if (actionIndex !== null && stepHierarchy[actionIndex]) {
+                        stepHierarchy[actionIndex].children.push(index);
+                    }
+                }
+            } else {
+                // This is a top-level step
+                console.log(`Adding step ${index} as top-level step`);
+                stepsContainer.appendChild(stepElement);
+            }
+
+            console.log('Step element added, hierarchy:', stepHierarchy);
+
+            // Update steps count immediately
+            document.getElementById('steps-count').innerText = `(${thoughtStepsCount})`;
+
+            // Scroll to bottom if this is a new thought or the last step
+            if (stepType === 'thought' || stepsCount === 0) {
+                stepsContainer.scrollTop = stepsContainer.scrollHeight;
+            }
+        }
+
+        // Determine step type based on step information
+        function determineStepType(stepInfo) {
+            if (!stepInfo) {
+                console.error('Cannot determine type for null/undefined step info');
+                return 'unknown';
+            }
+
+            // First priority: use the explicit type from the step info if available
+            if (stepInfo.type) {
+                console.log(`Using explicit type from step info: ${stepInfo.type}`);
+                return stepInfo.type;
+            }
+
+            // Second priority: check the title
+            const title = (stepInfo.title || '').toLowerCase();
+            console.log(`Determining type from title: "${title}"`);
+
+            if (title.includes('thinking') || title.includes('thought')) {
+                console.log('Detected as thought step from title');
+                return 'thought';
+            } else if (title.includes('using')) {
+                console.log('Detected as action step from title');
+                return 'action';
+            } else if (title.includes('result')) {
+                console.log('Detected as result step from title');
+                return 'result';
+            }
+
+            // Third priority: check if tool property exists (implies it's an action)
+            if (stepInfo.tool) {
+                console.log(`Has tool property (${stepInfo.tool}), so it's an action step`);
+                return 'action';
+            }
+
+            // Fourth priority: check the step_id format if available
+            if (stepInfo.step_id) {
+                if (stepInfo.step_id.startsWith('thought_')) {
+                    console.log('Detected as thought step from step_id');
+                    return 'thought';
+                } else if (stepInfo.step_id.startsWith('action_')) {
+                    console.log('Detected as action step from step_id');
+                    return 'action';
+                } else if (stepInfo.step_id.startsWith('result_')) {
+                    console.log('Detected as result step from step_id');
+                    return 'result';
+                }
+            }
+
+            console.log('Could not determine step type, defaulting to unknown');
+            return 'unknown';
+        }
+
+        // Toggle visibility of child steps
+        function toggleChildren(stepIndex) {
+            console.log('Toggling children for step', stepIndex);
+            const step = stepHierarchy[stepIndex];
+            if (!step) {
+                console.error('Step not found in hierarchy:', stepIndex);
+                return;
+            }
+
+            const stepElement = document.getElementById(`step-${stepIndex}`);
+            if (!stepElement) {
+                console.error('Step element not found:', stepIndex);
+                return;
+            }
+
+            const childContainer = stepElement.querySelector('.step-children');
+            if (!childContainer) {
+                console.log('No child container found for step', stepIndex);
+                return;
+            }
+
+            const isCollapsed = stepElement.classList.toggle('collapsed');
+            const arrowElement = stepElement.querySelector('.step-arrow');
+
+            if (isCollapsed) {
+                if (arrowElement) arrowElement.textContent = '►';
+                childContainer.style.display = 'none';
+                console.log('Collapsed children of step', stepIndex);
+            } else {
+                if (arrowElement) arrowElement.textContent = '▼';
+                childContainer.style.display = 'block';
+                console.log('Expanded children of step', stepIndex);
+            }
+        }
+
+        function updateElapsedTime() {
+            if (!startTime) return;
+
+            const now = new Date();
+            const elapsedSeconds = (now - startTime) / 1000;
+            document.getElementById('elapsed-time').innerText = formatTime(elapsedSeconds);
+        }
+
+        function formatTime(seconds) {
+            seconds = Math.floor(seconds);
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+
+            if (minutes === 0) {
+                return `${seconds} seconds`;
+            } else {
+                return `${minutes}m ${remainingSeconds}s`;
+            }
+        }
+
+        function updateStatus(status) {
+            document.getElementById('status').innerText = status;
+        }
+
+        function handleEvent(eventType, data) {
+            if (eventType === 'step') {
+                addStep(data.step_index, data);
+                stepsCount++;
+
+                // Only update the step count display for thought steps
+                if (determineStepType(data) === 'thought') {
+                    document.getElementById('steps-count').innerText = `(${thoughtStepsCount})`;
+                }
+            } else if (eventType === 'complete') {
+                // Update status and show result
+                updateStatus(data.status);
+
+                if (data.markdown) {
+                    // Display formatted markdown result
+                    document.getElementById('result-container').style.display = 'block';
+                    document.getElementById('result-content').innerHTML = formatMarkdown(data.markdown);
+                } else if (data.result) {
+                    document.getElementById('result-container').style.display = 'block';
+                    document.getElementById('result-content').innerText = data.result;
+                }
+
+                if (data.error) {
+                    document.getElementById('result-container').style.display = 'block';
+                    document.getElementById('result-content').innerText = 'Error: ' + data.error;
+                }
+
+                // Stop the connection
+                if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
+                }
+
+                // Re-enable submit button
+                document.getElementById('submit-btn').disabled = false;
+
+                // Stop timer
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+
+                if (data.elapsed_time) {
+                    document.getElementById('elapsed-time').innerText = formatTime(data.elapsed_time);
+                }
+            }
+        }
+
+        function abortQuery() {
+            if (!currentSessionId || currentSessionId === 'pending') {
+                updateStatus('No active session to abort');
+                return;
+            }
+
+            // Abort any active streams
+            abortActiveStream();
+
+            updateStatus('Aborting session...');
+
+            // Call the abort endpoint
+            fetch(`/api/abort/${currentSessionId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Abort response:', data);
+                    updateStatus(`Session aborted: ${data.status}`);
+
+                    // Re-enable submit button
+                    document.getElementById('submit-btn').disabled = false;
+
+                    // Stop timer
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error aborting session:', error);
+                    updateStatus(`Error aborting session: ${error.message}`);
+                });
+        }
+
+        // Reset the UI for a new query
+        function resetUI() {
+            console.log('Resetting UI for new query');
+            document.getElementById('steps-container').innerHTML = '';
+            document.getElementById('result-container').style.display = 'none';
+            document.getElementById('result-content').innerHTML = '';
+            document.getElementById('session-id').innerText = '-';
+            document.getElementById('status').innerText = 'Starting...';
+            document.getElementById('project-id').innerText = '-';
+            document.getElementById('elapsed-time').innerText = '0:00';
+
+            // Close any existing stream before starting a new one
+            abortActiveStream();
+        }
+
+        // Display error message
+        function showError(message) {
+            console.error('Error:', message);
+            const statusElement = document.getElementById('status');
+            statusElement.innerText = message;
+            statusElement.style.color = 'red';
+
+            // Revert color after a delay
+            setTimeout(() => {
+                statusElement.style.color = '';
+            }, 5000);
+        }
+
+        // Start the elapsed time timer
+        function startTimer() {
+            console.log('Starting timer');
+            startTime = new Date();
+
+            // Clear any existing timer
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+
+            // Update immediately once
+            updateElapsedTime();
+
+            // Then set interval for updates
+            timerInterval = setInterval(updateElapsedTime, 1000);
+        }
+    </script>
+</body>
+
+</html>

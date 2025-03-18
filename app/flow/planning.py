@@ -78,6 +78,9 @@ class PlanningFlow(BaseFlow):
                     )
                     return f"Failed to create plan for: {input_text}"
 
+                # Document the plan if the executor agent supports documentation
+                await self._document_plan()
+
             result = ""
             while True:
                 # Get current step to execute
@@ -87,6 +90,10 @@ class PlanningFlow(BaseFlow):
                 if self.current_step_index is None:
                     result += await self._finalize_plan()
                     break
+
+                # Document the current step if supported by executor
+                step_text = step_info.get("text", "") if step_info else ""
+                await self._document_step(step_text)
 
                 # Execute current step with appropriate agent
                 step_type = step_info.get("type") if step_info else None
@@ -392,3 +399,33 @@ class PlanningFlow(BaseFlow):
             except Exception as e2:
                 logger.error(f"Error finalizing plan with agent: {e2}")
                 return "Plan completed. Error generating summary."
+
+    async def _document_plan(self) -> None:
+        """Document the plan if the executor agent supports documentation"""
+        # Get plan text
+        plan_text = await self._get_plan_text()
+
+        # Check if any agent supports the _document_plan method
+        for agent_key, agent in self.agents.items():
+            if hasattr(agent, "_document_plan") and callable(getattr(agent, "_document_plan")):
+                try:
+                    await agent._document_plan(plan_text)
+                    logger.info(f"Plan documented by agent {agent_key}")
+                except Exception as e:
+                    logger.error(f"Error documenting plan with agent {agent_key}: {str(e)}")
+                break  # Only need one agent to document
+
+    async def _document_step(self, step_text: str) -> None:
+        """Document the current step if the executor agent supports documentation"""
+        if self.current_step_index is None:
+            return
+
+        # Check if any agent supports the _document_step method
+        for agent_key, agent in self.agents.items():
+            if hasattr(agent, "_document_step") and callable(getattr(agent, "_document_step")):
+                try:
+                    await agent._document_step(self.current_step_index, step_text)
+                    logger.info(f"Step {self.current_step_index} documented by agent {agent_key}")
+                except Exception as e:
+                    logger.error(f"Error documenting step with agent {agent_key}: {str(e)}")
+                break  # Only need one agent to document

@@ -1,6 +1,7 @@
 import asyncio
 import json
 from typing import Generic, Optional, TypeVar
+import logging
 
 from browser_use import Browser as BrowserUseBrowser
 from browser_use import BrowserConfig
@@ -575,3 +576,10 @@ Page content:
         tool = cls()
         tool.tool_context = context
         return tool
+        """Clean up resources when this object is garbage collected."""
+        try:
+            if hasattr(self, 'browser') and self.browser is not None:
+                logging.error("BrowserUseTool being garbage collected while browser is still open. This should be explicitly closed.")
+                # Don't run an event loop here as it can cause issues if another one is already running
+        except Exception as e:
+            logging.error(f"Error during BrowserUseTool garbage collection: {e}")
