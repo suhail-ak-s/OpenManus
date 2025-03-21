@@ -280,8 +280,10 @@ class LLM:
         formatted_messages = []
 
         for message in messages:
-            # Convert Message objects to dictionaries
+            # Handle Message objects before conversion to dict
+            base64_image = None
             if isinstance(message, Message):
+                base64_image = message.base64_image
                 message = message.to_dict()
 
             if not isinstance(message, dict):
@@ -291,8 +293,11 @@ class LLM:
             if "role" not in message:
                 raise ValueError("Message dict must contain 'role' field")
 
-            # Process base64 images if present
-            if message.get("base64_image"):
+            # Process base64 images if present - ONLY for user messages
+            if (base64_image or message.get("base64_image")) and message["role"] == "user":
+                # Use either the extracted base64_image or the one in the dict
+                image_data = base64_image or message.get("base64_image")
+
                 # Initialize or convert content to appropriate format
                 if not message.get("content"):
                     message["content"] = []
@@ -314,12 +319,13 @@ class LLM:
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": f"data:image/jpeg;base64,{message['base64_image']}"
+                            "url": image_data if image_data.startswith("data:") else f"data:image/jpeg;base64,{image_data}"
                         },
                     }
                 )
 
-                # Remove the base64_image field
+            # Remove the base64_image field if it exists - for ALL messages
+            if "base64_image" in message:
                 del message["base64_image"]
 
             # Only include messages with content or tool_calls

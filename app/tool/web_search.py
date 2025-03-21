@@ -1,10 +1,12 @@
 import asyncio
 from typing import List
+import urllib.parse
+from urllib.parse import urlparse
 
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import config
-from app.tool.base import BaseTool
+from app.tool.base import BaseTool, ToolResult
 from app.tool.search import (
     BaiduSearchEngine,
     DuckDuckGoSearchEngine,
@@ -39,18 +41,19 @@ class WebSearch(BaseTool):
         "duckduckgo": DuckDuckGoSearchEngine(),
     }
 
-    async def execute(self, query: str, num_results: int = 10) -> List[str]:
+    async def execute(self, query: str, num_results: int = 10) -> ToolResult:
         """
-        Execute a Web search and return a list of URLs.
+        Execute a Web search and return results with structured data.
 
         Args:
             query (str): The search query to submit to the search engine.
             num_results (int, optional): The number of search results to return. Default is 10.
 
         Returns:
-            List[str]: A list of URLs matching the search query.
+            ToolResult: A ToolResult object containing structured search results.
         """
         engine_order = self._get_engine_order()
+
         for engine_name in engine_order:
             engine = self._search_engine[engine_name]
             try:
@@ -58,10 +61,57 @@ class WebSearch(BaseTool):
                     engine, query, num_results
                 )
                 if links:
-                    return links
+                    # Convert links to structured data
+                    structured_results = []
+                    for i, link in enumerate(links):
+                        # Extract domain from URL
+                        try:
+                            parsed_url = urlparse(link)
+                            domain = parsed_url.netloc
+
+                            # Create result entry with structured data
+                            result = {
+                                "title": f"Result {i+1}",  # Default title if not available
+                                "url": link,
+                                "domain": domain,
+                                "snippet": f"Found at {domain}",
+                                "favicon": f"https://www.google.com/s2/favicons?domain={domain}"
+                            }
+                            structured_results.append(result)
+                        except Exception as e:
+                            # If parsing fails, add minimal info
+                            structured_results.append({
+                                "title": f"Result {i+1}",
+                                "url": link,
+                                "domain": "unknown",
+                                "snippet": "No description available",
+                                "favicon": ""
+                            })
+
+                    # Format the links for the text output
+                    result_text = "\n".join([f"{i+1}. {link}" for i, link in enumerate(links)])
+
+                    return ToolResult(
+                        output=f"Search results for '{query}':\n{result_text}",
+                        structured_data={
+                            "query": query,
+                            "engine": engine_name,
+                            "results": structured_results,
+                            "display_type": "search_results"
+                        }
+                    )
             except Exception as e:
                 print(f"Search engine '{engine_name}' failed with error: {e}")
-        return []
+
+        # Return empty result if all engines fail
+        return ToolResult(
+            output=f"No search results found for '{query}'.",
+            structured_data={
+                "query": query,
+                "results": [],
+                "display_type": "search_results"
+            }
+        )
 
     def _get_engine_order(self) -> List[str]:
         """

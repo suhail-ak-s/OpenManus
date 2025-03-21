@@ -234,15 +234,58 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                     page = await context.get_current_page()
                     await page.goto(url)
                     await page.wait_for_load_state()
-                    return ToolResult(output=f"Navigated to {url}")
+                    return ToolResult(
+                        output=f"Navigated to {url}",
+                        structured_data={
+                            "action_type": "navigate",
+                            "url": url,
+                            "display_type": "iframe"
+                        }
+                    )
 
                 elif action == "go_back":
                     await context.go_back()
-                    return ToolResult(output="Navigated back")
+                    page = await context.get_current_page()
+                    try:
+                        current_url = page.url
+                    except:
+                        # Fallback to getting URL from state
+                        try:
+                            state = await context.get_state()
+                            current_url = state.url
+                        except:
+                            current_url = "unknown_url"
+
+                    return ToolResult(
+                        output="Navigated back",
+                        structured_data={
+                            "action_type": "navigate_back",
+                            "url": current_url,
+                            "display_type": "iframe"
+                        }
+                    )
 
                 elif action == "refresh":
                     await context.refresh_page()
-                    return ToolResult(output="Refreshed current page")
+                    page = await context.get_current_page()
+                    try:
+                        current_url = page.url
+                    except:
+                        # Fallback to getting URL from state
+                        try:
+                            state = await context.get_state()
+                            current_url = state.url
+                        except:
+                            current_url = "unknown_url"
+
+                    return ToolResult(
+                        output="Refreshed current page",
+                        structured_data={
+                            "action_type": "refresh",
+                            "url": current_url,
+                            "display_type": "iframe"
+                        }
+                    )
 
                 elif action == "web_search":
                     if not query:
@@ -269,7 +312,14 @@ class BrowserUseTool(BaseTool, Generic[Context]):
 
                         return ToolResult(
                             output=f"Searched for '{query}' and navigated to first result: {url_to_navigate}\nAll results:"
-                            + "\n".join([str(r) for r in search_results])
+                            + "\n".join([str(r) for r in search_results]),
+                            structured_data={
+                                "action_type": "web_search",
+                                "query": query,
+                                "url": url_to_navigate,
+                                "search_results": search_results,
+                                "display_type": "iframe"
+                            }
                         )
                     else:
                         return ToolResult(
@@ -289,7 +339,15 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                     output = f"Clicked element at index {index}"
                     if download_path:
                         output += f" - Downloaded file to {download_path}"
-                    return ToolResult(output=output)
+                    return ToolResult(
+                        output=output,
+                        structured_data={
+                            "action_type": "click",
+                            "element_index": index,
+                            "download_path": download_path if download_path else None,
+                            "display_type": "element_interaction"
+                        }
+                    )
 
                 elif action == "input_text":
                     if index is None or not text:
@@ -301,7 +359,13 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                         return ToolResult(error=f"Element with index {index} not found")
                     await context._input_text_element_node(element, text)
                     return ToolResult(
-                        output=f"Input '{text}' into element at index {index}"
+                        output=f"Input '{text}' into element at index {index}",
+                        structured_data={
+                            "action_type": "input",
+                            "element_index": index,
+                            "text": text,
+                            "display_type": "element_interaction"
+                        }
                     )
 
                 elif action == "scroll_down" or action == "scroll_up":
@@ -315,7 +379,13 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                         f"window.scrollBy(0, {direction * amount});"
                     )
                     return ToolResult(
-                        output=f"Scrolled {'down' if direction > 0 else 'up'} by {amount} pixels"
+                        output=f"Scrolled {'down' if direction > 0 else 'up'} by {amount} pixels",
+                        structured_data={
+                            "action_type": "scroll",
+                            "direction": "down" if direction > 0 else "up",
+                            "amount": amount,
+                            "display_type": "scroll_indicator"
+                        }
                     )
 
                 elif action == "scroll_to_text":
@@ -327,7 +397,14 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                     try:
                         locator = page.get_by_text(text, exact=False)
                         await locator.scroll_into_view_if_needed()
-                        return ToolResult(output=f"Scrolled to text: '{text}'")
+                        return ToolResult(
+                            output=f"Scrolled to text: '{text}'",
+                            structured_data={
+                                "action_type": "scroll_to_text",
+                                "text": text,
+                                "display_type": "text_highlight"
+                            }
+                        )
                     except Exception as e:
                         return ToolResult(error=f"Failed to scroll to text: {str(e)}")
 
@@ -338,7 +415,14 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                         )
                     page = await context.get_current_page()
                     await page.keyboard.press(keys)
-                    return ToolResult(output=f"Sent keys: {keys}")
+                    return ToolResult(
+                        output=f"Sent keys: {keys}",
+                        structured_data={
+                            "action_type": "keys",
+                            "keys": keys,
+                            "display_type": "keyboard_interaction"
+                        }
+                    )
 
                 elif action == "get_dropdown_options":
                     if index is None:
@@ -391,6 +475,41 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                         # Get page content and convert to markdown for better processing
                         html_content = await page.content()
 
+                        # Get additional page information for visualization
+                        page_title = await page.title()
+                        current_url = page.url
+
+                        # Take a screenshot for visualization
+                        screenshot = None
+                        try:
+                            logging.info(f"Attempting to capture screenshot with full_page=True")
+                            # Try different screenshot methods
+                            try:
+                                # Try using full page screenshot first
+                                buffer = await page.screenshot(full_page=True)
+                                import base64
+                                screenshot = base64.b64encode(buffer).decode('utf-8')
+                                logging.info(f"Successfully captured full page screenshot, size: {len(screenshot) if screenshot else 0} bytes")
+                                # Ensure proper format for the base64 image
+                                if screenshot:
+                                    screenshot = f"data:image/png;base64,{screenshot}"
+                            except Exception as full_page_error:
+                                logging.error(f"Full page screenshot failed: {str(full_page_error)}")
+                                # Try viewport screenshot as fallback
+                                try:
+                                    logging.info("Attempting to capture viewport screenshot")
+                                    buffer = await page.screenshot()
+                                    import base64
+                                    screenshot = base64.b64encode(buffer).decode('utf-8')
+                                    logging.info(f"Successfully captured viewport screenshot, size: {len(screenshot) if screenshot else 0} bytes")
+                                    # Ensure proper format for the base64 image
+                                    if screenshot:
+                                        screenshot = f"data:image/png;base64,{screenshot}"
+                                except Exception as ss_error:
+                                    logging.error(f"Failed to capture viewport screenshot: {str(ss_error)}")
+                        except Exception as screenshot_error:
+                            logging.error(f"Failed to capture any screenshot: {str(screenshot_error)}")
+
                         # Import markdownify here to avoid global import
                         try:
                             import markdownify
@@ -433,18 +552,179 @@ Page content:
                         response = await self.llm.ask(messages)
 
                         msg = f"Extracted from page:\n{response}\n"
-                        return ToolResult(output=msg)
+
+                        # Get viewport and scroll position
+                        viewport_info = None
+                        scroll_position = None
+                        try:
+                            # Get viewport dimensions
+                            viewport_info = await page.evaluate("""() => {
+                                return {
+                                    width: window.innerWidth,
+                                    height: window.innerHeight
+                                }
+                            }""")
+
+                            # Get scroll position
+                            scroll_position = await page.evaluate("""() => {
+                                return {
+                                    x: window.scrollX,
+                                    y: window.scrollY,
+                                    max_y: Math.max(
+                                        document.body.scrollHeight,
+                                        document.documentElement.scrollHeight,
+                                        document.body.offsetHeight,
+                                        document.documentElement.offsetHeight
+                                    )
+                                }
+                            }""")
+                        except:
+                            pass
+
+                        # Create structured data
+                        structured_data = {
+                            "action_type": "extract_content",
+                            "goal": goal,
+                            "url": current_url,
+                            "display_type": "content_extraction",
+                            "extraction_result": response,
+                            "page_details": {
+                                "title": page_title,
+                                "has_screenshot": screenshot is not None,
+                                "viewport": viewport_info,
+                                "scroll_position": scroll_position
+                            }
+                        }
+
+                        # Return the extract content result with the page information
+                        result = ToolResult(
+                            output=msg,
+                            structured_data=structured_data,
+                            base64_image=screenshot
+                        )
+
+                        # Update the has_screenshot flag based on whether we have a screenshot
+                        if hasattr(result, "structured_data") and result.structured_data:
+                            if isinstance(result.structured_data, str):
+                                try:
+                                    data = json.loads(result.structured_data)
+                                    data["has_screenshot"] = bool(screenshot)
+                                    result.structured_data = json.dumps(data)
+                                except:
+                                    pass
+                            elif isinstance(result.structured_data, dict):
+                                result.structured_data["has_screenshot"] = bool(screenshot)
+
+                        return result
                     except Exception as e:
                         # Provide a more helpful error message
                         error_msg = f"Failed to extract content: {str(e)}"
                         try:
+                            # Try to get page details even during error
+                            page_title = "Unknown Page"
+                            current_url = "unknown_url"
+                            screenshot = None
+                            viewport_info = None
+                            scroll_position = None
+
+                            try:
+                                page_title = await page.title()
+                                current_url = page.url
+
+                                # Improve screenshot capture with fallbacks
+                                try:
+                                    logging.info(f"[Error handler] Attempting to capture screenshot with full_page=True")
+                                    # Try full page screenshot first
+                                    buffer = await page.screenshot(full_page=True)
+                                    import base64
+                                    screenshot = base64.b64encode(buffer).decode('utf-8')
+                                    logging.info(f"[Error handler] Successfully captured full page screenshot, size: {len(screenshot) if screenshot else 0} bytes")
+                                    # Ensure proper format for the base64 image
+                                    if screenshot:
+                                        screenshot = f"data:image/png;base64,{screenshot}"
+                                except Exception as full_page_error:
+                                    logging.error(f"[Error handler] Full page screenshot failed: {str(full_page_error)}")
+                                    # Try viewport screenshot as fallback
+                                    try:
+                                        logging.info("[Error handler] Attempting to capture viewport screenshot")
+                                        buffer = await page.screenshot()
+                                        import base64
+                                        screenshot = base64.b64encode(buffer).decode('utf-8')
+                                        logging.info(f"[Error handler] Successfully captured viewport screenshot, size: {len(screenshot) if screenshot else 0} bytes")
+                                        # Ensure proper format for the base64 image
+                                        if screenshot:
+                                            screenshot = f"data:image/png;base64,{screenshot}"
+                                    except Exception as ss_error:
+                                        logging.error(f"[Error handler] Failed to capture viewport screenshot: {str(ss_error)}")
+
+                                # Get viewport dimensions
+                                viewport_info = await page.evaluate("""() => {
+                                    return {
+                                        width: window.innerWidth,
+                                        height: window.innerHeight
+                                    }
+                                }""")
+
+                                # Get scroll position
+                                scroll_position = await page.evaluate("""() => {
+                                    return {
+                                        x: window.scrollX,
+                                        y: window.scrollY,
+                                        max_y: Math.max(
+                                            document.body.scrollHeight,
+                                            document.documentElement.scrollHeight,
+                                            document.body.offsetHeight,
+                                            document.documentElement.offsetHeight
+                                        )
+                                    }
+                                }""")
+                            except:
+                                # Fallback to state info if available
+                                try:
+                                    state = await context.get_state()
+                                    current_url = state.url
+                                    page_title = state.title
+                                except:
+                                    pass
+
                             # Try to return a portion of the page content as fallback
                             return ToolResult(
-                                output=f"{error_msg}\nHere's a portion of the page content:\n{content[:2000]}..."
+                                output=f"{error_msg}\nHere's a portion of the page content:\n{content[:2000]}...",
+                                base64_image=screenshot,
+                                structured_data={
+                                    "action_type": "extract_content",
+                                    "goal": goal,
+                                    "url": current_url,
+                                    "display_type": "content_extraction",
+                                    "extraction_result": f"{error_msg}\nHere's a portion of the page content:\n{content[:2000]}...",
+                                    "error": True,
+                                    "page_details": {
+                                        "title": page_title,
+                                        "has_screenshot": screenshot is not None,
+                                        "viewport": viewport_info,
+                                        "scroll_position": scroll_position
+                                    }
+                                }
                             )
                         except:
                             # If all else fails, just return the error
-                            return ToolResult(error=error_msg)
+                            return ToolResult(
+                                error=error_msg,
+                                structured_data={
+                                    "action_type": "extract_content",
+                                    "goal": goal,
+                                    "url": "unknown_url",
+                                    "display_type": "content_extraction",
+                                    "extraction_result": error_msg,
+                                    "error": True,
+                                    "page_details": {
+                                        "title": "Unknown Page",
+                                        "has_screenshot": False,
+                                        "viewport": None,
+                                        "scroll_position": None
+                                    }
+                                }
+                            )
 
                 # Tab management actions
                 elif action == "switch_tab":
@@ -502,7 +782,15 @@ Page content:
                 viewport_height = ctx.config.browser_window_size.get("height", 0)
 
             # Take a screenshot for the state
-            screenshot = await ctx.take_screenshot(full_page=True)
+            try:
+                page = await ctx.get_current_page()
+                buffer = await page.screenshot(full_page=True)
+                import base64
+                screenshot = base64.b64encode(buffer).decode('utf-8')
+                screenshot = f"data:image/png;base64,{screenshot}"
+            except Exception as e:
+                logging.error(f"Error taking screenshot in get_current_state: {str(e)}")
+                screenshot = None
 
             # Build the state info with all required fields
             state_info = {

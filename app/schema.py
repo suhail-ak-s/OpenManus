@@ -92,8 +92,9 @@ class Message(BaseModel):
             message["name"] = self.name
         if self.tool_call_id is not None:
             message["tool_call_id"] = self.tool_call_id
-        if self.base64_image is not None:
-            message["base64_image"] = self.base64_image
+        # Do not include base64_image in the dictionary for API calls
+        # if self.base64_image is not None:
+        #     message["base64_image"] = self.base64_image
         return message
 
     @classmethod

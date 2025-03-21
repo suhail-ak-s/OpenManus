@@ -39,6 +39,7 @@ class ToolResult(BaseModel):
     error: Optional[str] = Field(default=None)
     base64_image: Optional[str] = Field(default=None)
     system: Optional[str] = Field(default=None)
+    structured_data: Optional[Dict[str, Any]] = Field(default=None)
 
     class Config:
         arbitrary_types_allowed = True
@@ -61,10 +62,36 @@ class ToolResult(BaseModel):
             error=combine_fields(self.error, other.error),
             base64_image=combine_fields(self.base64_image, other.base64_image, False),
             system=combine_fields(self.system, other.system),
+            structured_data=combine_fields(self.structured_data, other.structured_data, False),
         )
 
     def __str__(self):
-        return f"Error: {self.error}" if self.error else self.output
+        """String representation that doesn't include base64_image data"""
+        if self.error:
+            return f"Error: {self.error}"
+
+        # Don't include base64_image in the string representation
+        # Focus on the text output and structured data if available
+        if self.structured_data:
+            import json
+
+            # If output exists, combine with structured data summary
+            if self.output:
+                # Truncate structured_data in string representation to avoid huge outputs
+                data_summary = str(self.structured_data)
+                if len(data_summary) > 100:
+                    data_summary = f"{data_summary[:97]}..."
+
+                return f"{self.output}\n[Structured data available: {data_summary}]"
+
+            # Return just structured data if no output
+            try:
+                return json.dumps(self.structured_data, indent=2)
+            except:
+                return str(self.structured_data)
+
+        # Return just the output if no structured data
+        return str(self.output) if self.output is not None else ""
 
     def replace(self, **kwargs):
         """Returns a new ToolResult with the given fields replaced."""

@@ -224,6 +224,8 @@ async def event_generator(
                 step_content = step.get("content", "")
                 tool_name = step.get("tool", "")
                 cycle_index = step.get("cycle_index", 0)
+                structured_data = step.get("structured_data")
+                base64_image = step.get("base64_image")
 
                 if step_type == "thought":
                     title = f"Step {step_idx}: Thinking"
@@ -248,7 +250,9 @@ async def event_generator(
                         "type": step_type,
                         "cycle_index": cycle_index,
                         "tool": tool_name,
-                        "step_info": step
+                        "step_info": step,
+                        "structured_data": structured_data,
+                        "base64_image": base64_image
                     })
                 }
 
@@ -285,6 +289,8 @@ async def event_generator(
                     step_content = step.get("content", "")
                     tool_name = step.get("tool", "")
                     cycle_index = step.get("cycle_index", 0)
+                    structured_data = step.get("structured_data")
+                    base64_image = step.get("base64_image")
 
                     if step_type == "thought":
                         title = f"Step {step_idx}: Thinking"
@@ -309,7 +315,9 @@ async def event_generator(
                             "type": step_type,
                             "cycle_index": cycle_index,
                             "tool": tool_name,
-                            "step_info": step
+                            "step_info": step,
+                            "structured_data": structured_data,
+                            "base64_image": base64_image
                         })
                     }
 
@@ -561,6 +569,45 @@ async def process_query(session_id: str, query: str, project_id: str, max_steps:
 
                         action_content = f"Tool: {tool_name}\nArguments: {args_str}"
 
+                        action_structured_data = None
+
+                        if tool_name == "browser_use":
+                            action_structured_data = {}
+                            action_type = args.get("action", "")
+
+                            if action_type == "go_to_url":
+                                action_structured_data = {
+                                    "action_type": "navigate",
+                                    "url": args.get("url", ""),
+                                    "display_type": "iframe"
+                                }
+                            elif action_type in ["scroll_down", "scroll_up"]:
+                                direction = "down" if action_type == "scroll_down" else "up"
+                                amount = args.get("scroll_amount", 0)
+                                action_structured_data = {
+                                    "action_type": "scroll",
+                                    "direction": direction,
+                                    "amount": amount,
+                                    "display_type": "scroll_indicator"
+                                }
+                            elif action_type == "click_element":
+                                action_structured_data = {
+                                    "action_type": "click",
+                                    "element_index": args.get("index", 0)
+                                }
+                            elif action_type == "extract_content":
+                                action_structured_data = {
+                                    "action_type": "extract_content",
+                                    "goal": args.get("goal", ""),
+                                    "display_type": "content_extraction"
+                                }
+                        elif tool_name == "web_search":
+                            action_structured_data = {
+                                "action_type": "web_search",
+                                "query": args.get("query", ""),
+                                "display_type": "search_query"
+                            }
+
                         parent_step_index = thought_action_map.get(cycle_index)
 
                         step_info = {
@@ -572,7 +619,8 @@ async def process_query(session_id: str, query: str, project_id: str, max_steps:
                             "type": "action",
                             "tool": tool_name,
                             "parent_id": f"thought_{cycle_index}",
-                            "step_id": f"action_{cycle_index}"
+                            "step_id": f"action_{cycle_index}",
+                            "structured_data": action_structured_data  # Add structured data to the step info
                         }
 
                         while len(active_flows[session_id].get("steps", [])) <= current_step:
@@ -589,6 +637,57 @@ async def process_query(session_id: str, query: str, project_id: str, max_steps:
                         if len(result_preview) > 300:
                             result_preview = result_preview[:300] + "..."
 
+                        result_structured_data = None
+                        result_base64_image = None
+
+                        if hasattr(agent, "_last_tool_result") and agent._last_tool_result:
+                            tool_result = agent._last_tool_result
+                            if hasattr(tool_result, "structured_data") and tool_result.structured_data:
+                                result_structured_data = tool_result.structured_data
+                                logger.info(f"Got structured_data from tool_result")
+
+                            if hasattr(tool_result, "base64_image") and tool_result.base64_image:
+                                result_base64_image = tool_result.base64_image
+                                logger.info(f"Got base64_image from tool_result")
+
+                        if not result_structured_data:
+                            if hasattr(result, "structured_data") and result.structured_data:
+                                result_structured_data = result.structured_data
+                            elif tool_name == "browser_use" and action_structured_data:
+                                if action_structured_data.get("action_type") == "navigate":
+                                    result_structured_data = {
+                                        "url": action_structured_data.get("url", ""),
+                                        "display_type": "iframe"
+                                    }
+                                elif action_structured_data.get("action_type") == "extract_content":
+                                    json_content = None
+                                    if "```json" in result_preview:
+                                        try:
+                                            import re
+                                            json_match = re.search(r"```json\s*([\s\S]*?)\s*```", result_preview)
+                                            if json_match:
+                                                json_str = json_match.group(1).strip()
+                                                json_content = json.loads(json_str)
+                                        except:
+                                            pass
+
+                                    result_structured_data = {
+                                        "action_type": "extract_content",
+                                        "goal": action_structured_data.get("goal", ""),
+                                        "display_type": "content_extraction",
+                                        "extraction_result": json_content or result_preview
+                                    }
+                                elif action_structured_data.get("action_type") == "web_search":
+                                    result_structured_data = {
+                                        "action_type": "web_search",
+                                        "query": action_structured_data.get("query", ""),
+                                        "display_type": "search_results"
+                                    }
+
+                        if not result_base64_image and hasattr(agent, "_current_base64_image") and agent._current_base64_image:
+                            result_base64_image = agent._current_base64_image
+                            logger.info(f"Got base64_image from _current_base64_image")
+
                         result_info = {
                             "index": current_step,
                             "cycle_index": cycle_index,
@@ -598,7 +697,9 @@ async def process_query(session_id: str, query: str, project_id: str, max_steps:
                             "type": "result",
                             "tool": tool_name,
                             "parent_id": f"action_{cycle_index}",
-                            "step_id": f"result_{cycle_index}"
+                            "step_id": f"result_{cycle_index}",
+                            "structured_data": result_structured_data,
+                            "base64_image": result_base64_image
                         }
 
                         while len(active_flows[session_id].get("steps", [])) <= current_step:

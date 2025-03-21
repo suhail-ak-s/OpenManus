@@ -177,12 +177,15 @@ class ToolCallAgent(ReActAgent):
             logger.info(f"🔧 Activating tool: '{name}'...")
             result = await self.available_tools.execute(name=name, tool_input=args)
 
+            # Store the full tool result object for later use
+            self._last_tool_result = result
+
             # Handle special tools
             await self._handle_special_tool(name=name, result=result)
 
             # Check if result is a ToolResult with base64_image
             if hasattr(result, "base64_image") and result.base64_image:
-                # Store the base64_image for later use in tool_message
+                # Store the base64_image for later use in UI only, not in messages
                 self._current_base64_image = result.base64_image
 
                 # Format result for display
