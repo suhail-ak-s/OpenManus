@@ -230,6 +230,7 @@ async def event_generator(
                 if step_type == "thought":
                     title = f"Step {step_idx}: Thinking"
                     markdown = step_content
+                    logger.info(f"Thought content length for step {step_idx}: {len(markdown)} characters")
                 elif step_type == "action":
                     title = f"Using {tool_name}"
                     markdown = f"Tool: {tool_name}\nArguments: {extract_args_from_content(step_content)}"
@@ -295,6 +296,7 @@ async def event_generator(
                     if step_type == "thought":
                         title = f"Step {step_idx}: Thinking"
                         markdown = step_content
+                        logger.info(f"Thought content length for step {step_idx}: {len(markdown)} characters")
                     elif step_type == "action":
                         title = f"Using {tool_name}"
                         markdown = f"Tool: {tool_name}\nArguments: {extract_args_from_content(step_content)}"
@@ -394,8 +396,6 @@ def get_first_line(content):
 
     for line in lines:
         if not line.startswith('#'):
-            if len(line) > 100:
-                return line[:97] + "..."
             return line
 
     if lines:
@@ -518,7 +518,7 @@ async def process_query(session_id: str, query: str, project_id: str, max_steps:
                     "index": current_step,
                     "cycle_index": cycle_index,
                     "title": f"Thinking",
-                    "content": safe_content[:500] + "..." if len(safe_content) > 500 else safe_content,
+                    "content": safe_content,
                     "timestamp": time.time(),
                     "type": "thought",
                     "parent_id": None,
@@ -634,8 +634,9 @@ async def process_query(session_id: str, query: str, project_id: str, max_steps:
                         current_step += 1
 
                         result_preview = str(result)
-                        if len(result_preview) > 300:
-                            result_preview = result_preview[:300] + "..."
+                        # Remove truncation
+                        # if len(result_preview) > 300:
+                        #     result_preview = result_preview[:300] + "..."
 
                         result_structured_data = None
                         result_base64_image = None
