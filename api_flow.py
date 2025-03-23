@@ -522,7 +522,7 @@ async def process_query(session_id: str, query: str, project_id: str, max_steps:
                     "timestamp": time.time(),
                     "type": "thought",
                     "parent_id": None,
-                    "step_id": f"thought_{cycle_index}"
+                    "step_id": f"thought_{current_step}"
                 }
 
                 while len(active_flows[session_id].get("steps", [])) <= current_step:
